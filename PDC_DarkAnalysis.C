@@ -23,11 +23,10 @@
 using namespace std;
 
 
-void PDC_DarkAnalysis(string inDirectoryName){
+void PDC_DarkAnalysis(string inFileName){
 
-    const char* fileName = inDirectoryName.c_str();
+    const char* fileName = inFileName.c_str();
 
-    filesystem::
 
 
     // Create a histogram for the values we read.
