@@ -23,14 +23,14 @@
 using namespace std;
 
 
-vector<TH1F*> histCollector(float VoV[7], const char *filenames[7], int temp)
+vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int size)
 {
     std::vector< TH1F* > hist;
 
     double windowResolution = 2.0/1000000000.0; //time resolution within window is 2ns
     double triggerResolution = 16.0/1000000000.0; //time resolution within full run is 16ns
 
-    for(int i=0; i<7; i++)
+    for(int i=0; i<size; i++)
     {
         //create histogram
         hist.push_back(new TH1F(Form("hist%d",i),Form("VoV = %f",VoV[i]), 500, 0, 2));
@@ -90,16 +90,19 @@ vector<TH1F*> histCollector(float VoV[7], const char *filenames[7], int temp)
 }
 
 void PDC_DarkAnalysis(){
+    int size = 7;
+    int temp = 160;
+    int dataNumbers[size] = {414,415,416,417,418,419,420};
 
-    float overVoltages[7] = {0.1,0.2,0.7,1.2,1.7,2.7};
-    const char *files[7] = {"root_output_files/output00414.root", "root_output_files/output00415.root","root_output_files/output00416.root","root_output_files/output00417.root","root_output_files/output00418.root","root_output_files/output00419.root","root_output_files/output00420.root"};
-    vector<TH1F*> histograms = histCollector(overVoltages, files, 160);
-
-    TCanvas *c1 = new TCanvas("c1","c1",800,800);
+    float overVoltages[size] = {0.1,0.2,0.3,0.7,1.2,1.7,2.7};
+    const char *files[size] = {Form("root_output_files/output00%d.root",dataNumbers[0]), Form("root_output_files/output00%d.root",dataNumbers[1]),Form("root_output_files/output00%d.root",dataNumbers[2]),Form("root_output_files/output00%d.root",dataNumbers[3]),Form("root_output_files/output00%d.root",dataNumbers[4]),Form("root_output_files/output00%d.root",dataNumbers[5]),Form("root_output_files/output00%d.root",dataNumbers[6])};
     
-    TFile *out = new TFile("histOutput160", "RECREATE");
+    vector<TH1F*> histograms = histCollector(overVoltages, files, temp, size);
+    
+    TFile *out = new TFile(Form("histOutput%d",temp), "RECREATE");
 
     for (int count = 0; count < 7; count ++){
+        histograms[count]->Fit("expo");
         histograms[count]->Write(Form("Hist%d",count));
     }
     
