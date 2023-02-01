@@ -10,7 +10,7 @@
 #include "TVector3.h"
 #include "TMath.h"
 #include "TGraph.h"
-#include "TMultiGraph.h"
+#include "TGraphErrors.h"
 #include "TH2D.h"
 #include "THStack.h"
 #include "TPad.h"
@@ -90,21 +90,59 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
 }
 
 void PDC_DarkAnalysis(){
-    int size = 7;
-    int temp = 160;
-    int dataNumbers[size] = {414,415,416,417,418,419,420};
 
-    float overVoltages[size] = {0.1,0.2,0.3,0.7,1.2,1.7,2.7};
-    const char *files[size] = {Form("root_output_files/output00%d.root",dataNumbers[0]), Form("root_output_files/output00%d.root",dataNumbers[1]),Form("root_output_files/output00%d.root",dataNumbers[2]),Form("root_output_files/output00%d.root",dataNumbers[3]),Form("root_output_files/output00%d.root",dataNumbers[4]),Form("root_output_files/output00%d.root",dataNumbers[5]),Form("root_output_files/output00%d.root",dataNumbers[6])};
+    std::vector< TF1* > fit;
+
+
+    int size = 6;
+    int temp = 40;
+
+    float fitRate[6];
+    float fitError[6];
+
+    int dataNumbers[6] = {463,464,465,466,467,468};
+    //40 {463,464,465,466,467,468};
+    //60 {450,451,452,453,454,455};
+    //80 {443,444,445,446,447,448};
+    //100 {436,437,438,439,440,441};
+    //120 {429,430,431,432,433,434};
+    //140 {422,423,424,425,426,427};
+    //160 {415,416,417,418,419,420};
+
+
+
+
+    float overVoltages[6] = {0.2,0.3,0.7,1.2,1.7,2.7};
+    float overVolErrors[6] = {0.05,0.05,0.05,0.05,0.05,0.05};
+    const char *files[6] = {Form("root_output_files/output00%d.root",dataNumbers[0]), Form("root_output_files/output00%d.root",dataNumbers[1]),Form("root_output_files/output00%d.root",dataNumbers[2]),Form("root_output_files/output00%d.root",dataNumbers[3]),Form("root_output_files/output00%d.root",dataNumbers[4]),Form("root_output_files/output00%d.root",dataNumbers[5])};
     
     vector<TH1F*> histograms = histCollector(overVoltages, files, temp, size);
     
-    TFile *out = new TFile(Form("histOutput%d",temp), "RECREATE");
+    TFile *out = new TFile(Form("histOutput%d.root",temp), "RECREATE");
 
-    for (int count = 0; count < 7; count ++){
-        histograms[count]->Fit("expo");
+    for (int count = 0; count < 6; count ++){
+        histograms[count]->Fit("expo","","",0.004,2);
+        fit.push_back(histograms[count]->GetFunction("expo"));
+
+        //write histo and fit
         histograms[count]->Write(Form("Hist%d",count));
+        fit[count]->Write(Form("Fit%d",count));
+
+        fitRate[count] = (fit[count]->GetParameter(1))*(-1000000000)/(1.296);
+        fitError[count] = fit[count]->GetParError(1)*(1000000000)/(1.296);
     }
-    
+    auto c1 = new TCanvas("c1","VoV vs Slope Fit",200,10,700,500);
+    c1->SetFillColor(0);
+    c1->SetGridx();
+    c1->SetGridy();
+    c1->GetFrame()->SetFillColor(21);
+    c1->GetFrame()->SetBorderSize(12);
+
+    auto gr = new TGraphErrors(size, overVoltages,fitRate,overVolErrors,fitError);
+    gr->SetMarkerStyle(22);
+    gr->GetXaxis()->SetTitle("VoV [V]");
+    gr->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
+    gr->Draw();
+    gr->Write(Form("Graph%d",temp));
     
 }
