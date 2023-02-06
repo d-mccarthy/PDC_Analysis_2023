@@ -41,7 +41,7 @@ void TGraph_Stacker_PDC(){
 
         errorGraphs.push_back( (TGraphErrors*)myFile->Get(graphs[i]) );
         errorGraphs[i]->SetMarkerStyle(104+i);
-        errorGraphs[i]->SetTitle(graphs[i]);
+        errorGraphs[i]->SetTitle(Form("Temp: %d C",-40-(20*i)));
         delete myFile;
     }
 
