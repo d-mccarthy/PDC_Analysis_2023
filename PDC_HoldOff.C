@@ -54,7 +54,7 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
     for(int i=0; i<size; i++)
     {
         //create histogram
-        hist.push_back(new TH1F(Form("hist%d",i),Form("VoV = %f",VoV[i]), 400, binArray));
+        hist.push_back(new TH1F(Form("hist%d",i),Form("HoldOff = %f",VoV[i]), 400, binArray));
         //open file and TTreeReader
         if(gSystem->AccessPathName(filenames[i]))
         {
@@ -244,7 +244,6 @@ void PDC_DarkAnalysis(){
     for (int count = 0; count < size; count ++){
 
         //fit range below is a workaround for the strange gaussian behavior of my time difference plots... don't understand the underlying distribution (PROBLEM!)
-        //Scale to plot expo fit nicely
         histograms[count]->Scale(histScales[count]);
         histograms[count]->Fit("expo","WL","",0.01,fitEndRange[count]); // L specifies log likelihood (which deals with the non-gaussian bin statistics in low count bins). We only fit after the first several bins to ignore afterpulsing. 
 

@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "TGraph_Stacker_PDC.C": "cpp",
+        "PDC_DarkAnalysis.C": "cpp",
+        "__split_buffer": "c",
+        "deque": "c",
+        "list": "c",
+        "string": "c",
+        "vector": "c",
+        "PDC_HoldOff.C": "cpp"
+    }
+}
