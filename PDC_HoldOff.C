@@ -28,33 +28,28 @@ using namespace std;
 vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int size)
 {
     std::vector< TH1F* > hist;
-    std::default_random_engine generator;
-    std::uniform_real_distribution<float> distribution(0.0,10.0); 
-
-    std::cout<<"Random number: " << distribution(generator)<<std::endl;
-    std::cout<<"Random number: " << distribution(generator)<<std::endl;
-    std::cout<<"Random number: " << distribution(generator)<<std::endl;
 
     double windowResolution = 2.0/1000000000.0; //time resolution within window is 2ns
     double triggerResolution = 16.0/1000000000.0; //time resolution within full run is 16ns
-    double binArray[401];
+    double binArray[121];
 
     const int length = size;
     
 
     //rebin histograms so all bins have statistics
-    for(int j =0; j<401; j++){
+    for(int j =0; j<121; j++){
 
-        binArray[j]= ((pow(2.7162,j*0.05+2) - 1)/100000000);   
+        //binArray[j]= ((pow(2.7162,(j)*0.09))/1000000000);   
+        binArray[j]= ((pow(2.7162,j*0.19))/1E9);  
         
     }
 
-    double pulseWidth[6] = {80.0,37.0,25.0,19.0,15.0,13.0}; //in ADC counts -- 50 ns pulses are 25 ADC
-    
+    float pulseWidth[6] = {80.0,37.0,25.0,19.0,15.0,13.0}; //in ADC counts -- 50 ns pulses are 25 ADC
+
     for(int i=0; i<size; i++)
     {
         //create histogram
-        hist.push_back(new TH1F(Form("hist%d",i),Form("HoldOff = %f",VoV[i]), 400, binArray));
+        hist.push_back(new TH1F(Form("hist%d",i),Form("PulseWidth = %f [ns]",2*pulseWidth[i]), 120, binArray));
         //open file and TTreeReader
         if(gSystem->AccessPathName(filenames[i]))
         {
@@ -67,6 +62,7 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
        
         TFile *myFile = TFile::Open(filenames[i]);
         TTreeReader myReader("TPulse", myFile);
+        TTreeReaderArray<Int_t> myEvent(myReader,"eventcounter");
         TTreeReaderArray<Double_t> myMTS(myReader, "mts");
         TTreeReaderArray<Double_t> myTIME(myReader, "time");
         TTreeReaderArray<Double_t> myTrigTIME(myReader,"trigtime");
@@ -94,10 +90,14 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
                     trigCounter++;
                 }
                 
-                timeNow = (myTrigTIME[j]+distribution(generator)+trigCounter*2147483648)*(triggerResolution) + myTIME[j] * (windowResolution);
+                timeNow = (myTrigTIME[j]+trigCounter*2147483648)*(triggerResolution) + myTIME[j] * (windowResolution);
                 timeBetween = timeNow - timeBefore;
                 
-                hist[i]->Fill(timeBetween);
+                // if (i == 2 && timeBetween < 50/1E9){
+                //     std::cout<<"Time is too short at event = "<< myEvent[j] <<" time is : "<< timeBetween <<std::endl;
+                // }
+
+                hist[i]->Fill(timeBetween); 
 
                 //logic to deal with two->seven pulses back to back (rarely see more than 2 except at room temp)
                 //fill the hist with time between of one pulse width (50 ns)
@@ -179,7 +179,7 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
     return hist;
 }
 
-void PDC_DarkAnalysis(){
+void PDC_HoldOff(){
 
     //store the fits in a vector to retrieve later for error propagation
     std::vector< TF1* > fit;
@@ -232,7 +232,7 @@ void PDC_DarkAnalysis(){
     Form("root_output_files/output00%d.root",dataNumbers[4]),
     Form("root_output_files/output00%d.root",dataNumbers[5])
     };
-    float overVolErrors[size] = {0.1,0.1,0.1,0.1,0.1,0.1};
+    float overVolErrors[size] = {1.0,1.0,1.0,1.0,1.0,1.0};
     double histScales[size] = {1,2,4,20,40,60};
     // initialize files
     
@@ -244,7 +244,7 @@ void PDC_DarkAnalysis(){
     for (int count = 0; count < size; count ++){
 
         //fit range below is a workaround for the strange gaussian behavior of my time difference plots... don't understand the underlying distribution (PROBLEM!)
-        histograms[count]->Scale(histScales[count]);
+        //histograms[count]->Scale(histScales[count]);
         histograms[count]->Fit("expo","WL","",0.01,fitEndRange[count]); // L specifies log likelihood (which deals with the non-gaussian bin statistics in low count bins). We only fit after the first several bins to ignore afterpulsing. 
 
         fit.push_back(histograms[count]->GetFunction("expo")); // save the fit paramters to a vector
@@ -252,10 +252,15 @@ void PDC_DarkAnalysis(){
         //write histo and fit
         histograms[count]->Write(Form("Hist%d",count));
         fit[count]->Write(Form("Fit%d",count));
-
+//  scaled
         fitRate[count] = (fit[count]->GetParameter(1))*(-1000000000)/(1.296);
         fitError[count] = fit[count]->GetParError(1)*(1000000000)/(1.296);
+
+//  unscaled
+        // fitRate[count] = -1*(fit[count]->GetParameter(1));
+        // fitError[count] = -1*(fit[count]->GetParError(1));
     }
+    float pulseWidths[6] = {160.0,74.0,50.0,38.0,30.0,26.0};
 
     // make the graphs
     auto c1 = new TCanvas("c1","HoV vs Slope Fit",200,10,700,500);
@@ -265,10 +270,13 @@ void PDC_DarkAnalysis(){
     c1->GetFrame()->SetFillColor(21);
     c1->GetFrame()->SetBorderSize(12);
 
-    auto gr = new TGraphErrors(size, overVoltages,fitRate,overVolErrors,fitError);
+    auto gr = new TGraphErrors(size, pulseWidths,fitRate,overVolErrors,fitError);
     gr->SetMarkerStyle(22);
-    gr->GetXaxis()->SetTitle("HoldOff [V]");
+    gr->GetXaxis()->SetTitle("Pulse width [ns]");
+    //scaled
     gr->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
+    //unscaled
+    //gr->GetYaxis()->SetTitle("DCR [Hz]");
     gr->Draw();
     gr->Write(Form("Graph%d",temp));
 
@@ -279,15 +287,16 @@ void PDC_DarkAnalysis(){
     c1->SetGridy();
     c1->GetFrame()->SetFillColor(21);
     c1->GetFrame()->SetBorderSize(12);
+    
 
     gPad->SetLogy();
     gPad->SetLogx();
 
     
-
-    histograms[0]->Draw("PLC PMC");
-    for (int num = 1; num < size; num++){
-        histograms[num]->Draw("same PLC PMC");
+    
+    histograms[size-1]->Draw("hist PLC PMC");
+    for (int num = 0; num < size-1; num++){
+        histograms[size-2-num]->Draw("same hist PLC PMC");
     }
     gPad->BuildLegend();
 

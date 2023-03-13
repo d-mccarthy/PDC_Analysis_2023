@@ -49,7 +49,7 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
         
     }
 
-    double pulseWidth[6] = {80.0,37.0,25.0,19.0,15.0,13.0}; //in ADC counts -- 50 ns pulses are 25 ADC
+    double pulseWidth[size] = {25.0,25.0,25.0,25.0,25.0,25.0}; //in ADC counts -- 50 ns pulses are 25 ADC
     
     for(int i=0; i<size; i++)
     {
@@ -94,7 +94,7 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
                     trigCounter++;
                 }
                 
-                timeNow = (myTrigTIME[j]+distribution(generator)+trigCounter*2147483648)*(triggerResolution) + myTIME[j] * (windowResolution);
+                timeNow = ((myTrigTIME[j]-300)+distribution(generator)+trigCounter*2147483648)*(triggerResolution) + myTIME[j] * (windowResolution);
                 timeBetween = timeNow - timeBefore;
                 
                 hist[i]->Fill(timeBetween);
@@ -245,7 +245,7 @@ void PDC_DarkAnalysis(){
 
         //fit range below is a workaround for the strange gaussian behavior of my time difference plots... don't understand the underlying distribution (PROBLEM!)
         //Scale to plot expo fit nicely
-        histograms[count]->Scale(histScales[count]);
+        //histograms[count]->Scale(histScales[count]);
         histograms[count]->Fit("expo","WL","",0.01,fitEndRange[count]); // L specifies log likelihood (which deals with the non-gaussian bin statistics in low count bins). We only fit after the first several bins to ignore afterpulsing. 
 
         fit.push_back(histograms[count]->GetFunction("expo")); // save the fit paramters to a vector
