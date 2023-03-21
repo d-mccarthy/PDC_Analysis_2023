@@ -62,7 +62,6 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
        
         TFile *myFile = TFile::Open(filenames[i]);
         TTreeReader myReader("TPulse", myFile);
-        TTreeReaderArray<Int_t> myEvent(myReader,"eventcounter");
         TTreeReaderArray<Double_t> myMTS(myReader, "mts");
         TTreeReaderArray<Double_t> myTIME(myReader, "time");
         TTreeReaderArray<Double_t> myTrigTIME(myReader,"trigtime");
@@ -179,10 +178,22 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
     return hist;
 }
 
+// make histograms for afterpulsing (subtract the fit, etc)
+
+
 void PDC_HoldOff(){
 
     //store the fits in a vector to retrieve later for error propagation
     std::vector< TF1* > fit;
+    std::vector<TH1F*> residuals;
+
+    double binArray[121];
+    float pulseWidth[6] = {80.0,37.0,25.0,19.0,15.0,13.0}; //in ADC counts -- 50 ns pulses are 25 ADC
+    for(int j =0; j<121; j++){
+
+        binArray[j]= ((pow(2.7162,j*0.19))/1E9);  
+        
+    }
 
     const int size = 6; // will need to change number of filenames in files array to match (should do as a vector, but root was seg faulting for me)
 
@@ -194,6 +205,8 @@ void PDC_HoldOff(){
     float temperature[1] = {999.0};
 
     int dataNumbers[size] = {602,603,599,604,605,606};
+
+
     //LOW STAT DATA
     //40 {463,464,465,466,467,468};
     //60 {450,451,452,453,454,455};
@@ -232,8 +245,11 @@ void PDC_HoldOff(){
     Form("root_output_files/output00%d.root",dataNumbers[4]),
     Form("root_output_files/output00%d.root",dataNumbers[5])
     };
+
     float overVolErrors[size] = {1.0,1.0,1.0,1.0,1.0,1.0};
     double histScales[size] = {1,2,4,20,40,60};
+
+
     // initialize files
     
     //Form("root_output_files/output00%d.root",dataNumbers[4]),Form("root_output_files/output00%d.root",dataNumbers[5])
@@ -243,11 +259,18 @@ void PDC_HoldOff(){
 
     for (int count = 0; count < size; count ++){
 
-        //fit range below is a workaround for the strange gaussian behavior of my time difference plots... don't understand the underlying distribution (PROBLEM!)
+   
         //histograms[count]->Scale(histScales[count]);
         histograms[count]->Fit("expo","WL","",0.01,fitEndRange[count]); // L specifies log likelihood (which deals with the non-gaussian bin statistics in low count bins). We only fit after the first several bins to ignore afterpulsing. 
 
         fit.push_back(histograms[count]->GetFunction("expo")); // save the fit paramters to a vector
+
+        //create histogram of residuals (afterpulsing)
+        residuals.push_back(new TH1F(Form("residualsHist%d",count),Form("PulseWidth = %f [ns]",2*pulseWidth[count]), 120, binArray));
+        for (int scan = 0; scan < 120; scan++){
+            residuals[count]->SetBinContent(scan,histograms[count]->GetBinContent(scan) - fit[count]->Eval(histograms[count]->GetBinCenter(scan)));
+            //histograms[count]->GetBinContent(scan) - fit[count]->Eval(histograms[count]->GetBinCenter(scan)
+        }
 
         //write histo and fit
         histograms[count]->Write(Form("Hist%d",count));
@@ -256,13 +279,16 @@ void PDC_HoldOff(){
         fitRate[count] = (fit[count]->GetParameter(1))*(-1000000000)/(1.296);
         fitError[count] = fit[count]->GetParError(1)*(1000000000)/(1.296);
 
+
+
 //  unscaled
         // fitRate[count] = -1*(fit[count]->GetParameter(1));
         // fitError[count] = -1*(fit[count]->GetParError(1));
     }
+
     float pulseWidths[6] = {160.0,74.0,50.0,38.0,30.0,26.0};
 
-    // make the graphs
+// TGraph 
     auto c1 = new TCanvas("c1","HoV vs Slope Fit",200,10,700,500);
     c1->SetFillColor(0);
     c1->SetGridx();
@@ -280,7 +306,7 @@ void PDC_HoldOff(){
     gr->Draw();
     gr->Write(Form("Graph%d",temp));
 
-
+// Time Difference Plot
     auto c2 = new TCanvas("c2","Time Difference Distributions",200,10,700,500);
     c1->SetFillColor(0);
     c1->SetGridx();
@@ -292,14 +318,28 @@ void PDC_HoldOff(){
     gPad->SetLogy();
     gPad->SetLogx();
 
-    
-    
     histograms[size-1]->Draw("hist PLC PMC");
     for (int num = 0; num < size-1; num++){
         histograms[size-2-num]->Draw("same hist PLC PMC");
     }
     gPad->BuildLegend();
+// Afterpulsing plot
+    auto c3 = new TCanvas("c3","Afterpulsing Distributions",200,10,700,500);
+    c1->SetFillColor(0);
+    c1->SetGridx();
+    c1->SetGridy();
+    c1->GetFrame()->SetFillColor(21);
+    c1->GetFrame()->SetBorderSize(12);
 
+    gPad->SetLogx();  
+    gPad->SetLogy();
+
+    residuals[size-1]->Draw("PLC PMC");
+    for (int num = 0; num < size-1; num++){
+        residuals[size-2-num]->Draw("same PLC PMC");
+    }
+    gPad->BuildLegend();
+    
     ofstream myFile;
     myFile.open(Form("%d_VoV_DNR.txt",temp));
     myFile << "VoV" <<", ";

@@ -28,33 +28,27 @@ using namespace std;
 vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int size)
 {
     std::vector< TH1F* > hist;
-    std::default_random_engine generator;
-    std::uniform_real_distribution<float> distribution(0.0,10.0); 
-
-    std::cout<<"Random number: " << distribution(generator)<<std::endl;
-    std::cout<<"Random number: " << distribution(generator)<<std::endl;
-    std::cout<<"Random number: " << distribution(generator)<<std::endl;
 
     double windowResolution = 2.0/1000000000.0; //time resolution within window is 2ns
     double triggerResolution = 16.0/1000000000.0; //time resolution within full run is 16ns
-    double binArray[401];
+    double binArray[121];
 
     const int length = size;
     
 
     //rebin histograms so all bins have statistics
-    for(int j =0; j<401; j++){
+    for(int j =0; j<121; j++){
 
-        binArray[j]= ((pow(2.7162,j*0.05+2) - 1)/100000000);   
+        binArray[j]= ((pow(2.7162,j*0.19))/1E9);    
         
     }
 
-    double pulseWidth[size] = {25.0,25.0,25.0,25.0,25.0,25.0}; //in ADC counts -- 50 ns pulses are 25 ADC
+    double pulseWidth[5] = {25.0,25.0,25.0,25.0,25.0}; //in ADC counts -- 50 ns pulses are 25 ADC
     
     for(int i=0; i<size; i++)
     {
         //create histogram
-        hist.push_back(new TH1F(Form("hist%d",i),Form("VoV = %f",VoV[i]), 400, binArray));
+        hist.push_back(new TH1F(Form("hist%d",i),Form("VoV = %f",VoV[i]), 120, binArray));
         //open file and TTreeReader
         if(gSystem->AccessPathName(filenames[i]))
         {
@@ -94,7 +88,8 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
                     trigCounter++;
                 }
                 
-                timeNow = ((myTrigTIME[j]-300)+distribution(generator)+trigCounter*2147483648)*(triggerResolution) + myTIME[j] * (windowResolution);
+                timeNow = ((myTrigTIME[j])+trigCounter*2147483648)*(triggerResolution) + myTIME[j] * (windowResolution);
+                //timeNow = (myTrigTIME[j])*(triggerResolution);
                 timeBetween = timeNow - timeBefore;
                 
                 hist[i]->Fill(timeBetween);
@@ -184,16 +179,16 @@ void PDC_DarkAnalysis(){
     //store the fits in a vector to retrieve later for error propagation
     std::vector< TF1* > fit;
 
-    const int size = 6; // will need to change number of filenames in files array to match (should do as a vector, but root was seg faulting for me)
+    const int size = 5; // will need to change number of filenames in files array to match (should do as a vector, but root was seg faulting for me)
 
-    int temp = 999;
+    int temp = 190;
 
     float fitRate[size];
     float fitError[size];
 
-    float temperature[1] = {999.0};
+    float temperature[1] = {190.0};
 
-    int dataNumbers[size] = {602,603,599,604,605,606};
+    int dataNumbers[size] = {537,544,545,546,547};
     //LOW STAT DATA
     //40 {463,464,465,466,467,468};
     //60 {450,451,452,453,454,455};
@@ -217,38 +212,42 @@ void PDC_DarkAnalysis(){
     //hold off -50 {602,603,599,604,605,606};
 
 
-    float overVoltages[size] = {0.2,0.5,0.75,1,1.25,1.5};
+    float overVoltages[size] = {4,5,6,7,8};
     //old data {0.1,0.2,0.7,1.2,1.7,2.7};
     //new data 
     //room temp{0.5,1.5,3,4.5,6,7,8};
     //hold off{0.1,0.2,0.5,0.75,1,1.25,1.5,1.75}
 
-    float fitEndRange[size] = {0.6,0.6,0.6,0.6,0.6,0.6};
+    float fitEndRange[size] = {7,4.9,2.8,1.4,0.6};
 
     const char *files[size] = {Form("root_output_files/output00%d.root",dataNumbers[0]),
     Form("root_output_files/output00%d.root",dataNumbers[1]),
     Form("root_output_files/output00%d.root",dataNumbers[2]),
     Form("root_output_files/output00%d.root",dataNumbers[3]),
     Form("root_output_files/output00%d.root",dataNumbers[4]),
-    Form("root_output_files/output00%d.root",dataNumbers[5])
     };
-    float overVolErrors[size] = {0.1,0.1,0.1,0.1,0.1,0.1};
-    double histScales[size] = {1,2,4,20,40,60};
+    float overVolErrors[size] = {0.1,0.1,0.1,0.1,0.1};
     // initialize files
     
     //Form("root_output_files/output00%d.root",dataNumbers[4]),Form("root_output_files/output00%d.root",dataNumbers[5])
     vector<TH1F*> histograms = histCollector(overVoltages, files, temp, size);
+    vector<TH1F*> residuals;
     // output file
     TFile *out = new TFile(Form("histOutput%d.root",temp), "RECREATE");
 
     for (int count = 0; count < size; count ++){
 
-        //fit range below is a workaround for the strange gaussian behavior of my time difference plots... don't understand the underlying distribution (PROBLEM!)
         //Scale to plot expo fit nicely
         //histograms[count]->Scale(histScales[count]);
         histograms[count]->Fit("expo","WL","",0.01,fitEndRange[count]); // L specifies log likelihood (which deals with the non-gaussian bin statistics in low count bins). We only fit after the first several bins to ignore afterpulsing. 
 
         fit.push_back(histograms[count]->GetFunction("expo")); // save the fit paramters to a vector
+        
+        //create histogram of residuals (afterpulsing)
+        residuals.push_back(new TH1F(Form("residualsHist%d",i),Form("VoV = %f",VoV[i]), 120, binArray));
+        for (int scan = 0; scan < 120; scan++){
+            residuals[count]->SetBinContent(scan,hist[count]->GetBinContent(scan) - fit[count]->Eval(hist[count]->GetBinCenter[i]));
+        }
 
         //write histo and fit
         histograms[count]->Write(Form("Hist%d",count));
@@ -259,7 +258,7 @@ void PDC_DarkAnalysis(){
     }
 
     // make the graphs
-    auto c1 = new TCanvas("c1","HoV vs Slope Fit",200,10,700,500);
+    auto c1 = new TCanvas("c1","VoV vs Slope Fit",200,10,700,500);
     c1->SetFillColor(0);
     c1->SetGridx();
     c1->SetGridy();
@@ -268,7 +267,7 @@ void PDC_DarkAnalysis(){
 
     auto gr = new TGraphErrors(size, overVoltages,fitRate,overVolErrors,fitError);
     gr->SetMarkerStyle(22);
-    gr->GetXaxis()->SetTitle("HoldOff [V]");
+    gr->GetXaxis()->SetTitle("VoV [V]");
     gr->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
     gr->Draw();
     gr->Write(Form("Graph%d",temp));
@@ -282,13 +281,27 @@ void PDC_DarkAnalysis(){
     c1->GetFrame()->SetBorderSize(12);
 
     gPad->SetLogy();
-    gPad->SetLogx();
-
-    
+    gPad->SetLogx();    
 
     histograms[0]->Draw("PLC PMC");
     for (int num = 1; num < size; num++){
         histograms[num]->Draw("same PLC PMC");
+    }
+    gPad->BuildLegend();
+
+    auto c3 = new TCanvas("c3","Afterpulsing Distributions",200,10,700,500);
+    c1->SetFillColor(0);
+    c1->SetGridx();
+    c1->SetGridy();
+    c1->GetFrame()->SetFillColor(21);
+    c1->GetFrame()->SetBorderSize(12);
+
+    gPad->SetLogy();
+    gPad->SetLogx();    
+
+    residuals[0]->Draw("PLC PMC");
+    for (int num = 1; num < size; num++){
+        residuals[num]->Draw("same PLC PMC");
     }
     gPad->BuildLegend();
 
