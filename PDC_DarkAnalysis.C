@@ -330,7 +330,7 @@ void PDC_DarkAnalysis(
 
     // output file
 
-    TFile *out = new TFile(Form("histOutput_%d_%d.root",temp,anode), "RECREATE");
+    TFile *out = new TFile(Form("PDCOutput/histOutput_%d_%d.root",temp,anode), "RECREATE");
 
     for (int count = 0; count < fileNumber; count ++){
 
