@@ -24,35 +24,35 @@ void TGraph_Stacker_PDC(){
 
     vector<TGraphErrors*> errorGraphs;
 
-    const int size = 9;
+    const int size = 7;
     //naming is bad right now, silly mistake -- 60 is -60, 80 is -80
-    const char* files[size] = {"histOutput170.root","histOutput190.root","histOutput210.root","histOutput230.root","histOutput240.root","histOutput250.root","histOutput260.root","histOutput270.root","histOutput300.root"};
-    const char* graphs[size] = {"Graph170","Graph190","Graph210","Graph230","Graph240","Graph250","Graph260","Graph270","Graph300"};
-    const char* temps[size] = {"-100","-80","-60","-40","-30","-20","-10","0","20"};
-    const float temperatures[size] = {175.0,195.0,215.0,235.0,245.0,255.0,265.0,275.0,300.0};
+    const char* files[size] = {"histOutput90.root","histOutput_133_7.root","histOutput_163_7.root","histOutput200.root","histOutput_223_32.root","histOutput_273_7.root","histOutput300.root"};
+    const char* graphs[size] = {"Graph90","Graph133_anode7","Graph163_anode7","Graph200","Graph223_anode32","Graph273_anode7","Graph300"};
+    const char* temps[size] = {"93","133","163","193","223","273","293"};
+    const float temperatures[size] = {93,133,163,193,223,273,293};
 
-    auto tempGr = new TGraphErrors(5);
-    tempGr->SetTitle(Form("DNR vs Temp @4VoV"));
+    auto tempGr = new TGraphErrors(7);
+    tempGr->SetTitle(Form("DCR vs Temp @4VoV"));
     tempGr->GetXaxis()->SetTitle("Temp [K]");
     tempGr->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
 
     for(int i = 0; i < size; i++)
     {
         TFile *myFile = TFile::Open(files[i]);
-        // if(gSystem->AccessPathName(files[i]))
-        // {
-        //     std::cout << "file does not exist" << std::endl;
-        // } 
-        // else 
-        // {
-        //     std::cout << "file exists" << std::endl;
-        // };
+        if(gSystem->AccessPathName(files[i]))
+        {
+            std::cout << "file does not exist" << std::endl;
+        } 
+        else 
+        {
+            std::cout << "file exists" << std::endl;
+        };
 
         errorGraphs.push_back( (TGraphErrors*)myFile->Get(graphs[i]) );
         errorGraphs[i]->SetMarkerStyle(104);
         errorGraphs[i]->SetTitle(Form("Temp: %s C",temps[i]));
         
-        if (i<3){
+        if (temperatures[i]<250 || temperatures[i]==293){
             std::cout << errorGraphs[i]->GetPointX(0)<<std::endl;
             std::cout << errorGraphs[i]->GetPointY(0)<< " " << errorGraphs[i]->GetErrorY(0) << std::endl;
             std::cout << temperatures[i]<< " " << 5 << std::endl;
@@ -87,6 +87,7 @@ void TGraph_Stacker_PDC(){
 
     gPad->SetLogy();
 
+    stackOfTemps->SetTitle(Form("DCR vs VoV for 7 Temperatures"));
     stackOfTemps->GetXaxis()->SetTitle("VoV [V]");
     stackOfTemps->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
 
@@ -101,7 +102,7 @@ void TGraph_Stacker_PDC(){
     c2->GetFrame()->SetBorderSize(12);
     
     gPad->SetLogy();
-
+    tempGr->SetMarkerStyle(24);
     tempGr->Draw("ALP");
 
 

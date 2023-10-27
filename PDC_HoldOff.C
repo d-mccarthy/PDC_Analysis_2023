@@ -29,6 +29,8 @@ double triggerResolution = 16.0/1E9; //time resolution within full run is 16ns
 
 double binArray[121];
 float pulseWidth[6] = {80.0,37.0,25.0,19.0,15.0,13.0}; //in ADC counts -- 50 ns pulses are 25 ADC
+float pulseWidthNS[6] = {160.0,74.0,50.0,38.0,30.0,26.0};
+
 
 void filler(int repeats, TH1F* toFill, float width){
     for(int inx = 0; inx<repeats;inx++){
@@ -37,45 +39,62 @@ void filler(int repeats, TH1F* toFill, float width){
     
 }
 
+// Function to give the afterpulsing distribution with the probability distribution function of the total DNR as input.
 vector<TH1F*> unShadower(vector<TH1F*> inputHist){
-    std::vector< TH1F* > unShadowed; 
+    //define the binning of the histogram. This was done by eye to give reasonable statistics in each bin.
+    for(int j =0; j<121; j++){
+
+        binArray[j]= ((pow(2.7162,j*0.19))/1E9);    
+        
+    }
+    // initialize a vector of histograms to give as output
+    std::vector< TH1F* > unShadowed;
+    // initialize variables: following from 
     double lambda;
-    double beta=0;
+    double beta;
     double sigPi;
     double sigLambda;
-    double sigBeta=0.;
+    double sigBeta;
     double Pi;
     double PiWidth;
+    int numBins;
 
     for(int hInx = 0; hInx<inputHist.size(); hInx++){
         unShadowed.push_back(new TH1F(Form("unShadowedHist%d",hInx),Form("PulseWidth = %f [ns]",2*pulseWidth[hInx]),120,binArray));
-        beta=0;
+        beta=0.;
         sigBeta=0.;
-        for(int ti = 0;ti<inputHist[hInx]->GetNbinsX();ti++){
+        numBins = inputHist[hInx]->GetNbinsX();
+
+
+        for(int ti = 0; ti < numBins-5 ; ti++){
 
             Pi = inputHist[hInx]->GetBinContent(ti);
 
-            if(Pi == 0 || std::isnan(inputHist[hInx]->GetBinWidth(ti))){
-                continue;
-            }
-            else{
-                std::cout << Pi << std::endl;
-            }
             sigPi = (inputHist[hInx]->GetBinError(ti));
-            lambda = -log(1-Pi/exp(-beta));
+           
+            lambda = -log(1-(Pi/exp(-beta)));
 
             sigLambda = sqrt(sigPi*sigPi+Pi*Pi*sigBeta*sigBeta)/(exp(-beta)-Pi);
+            cout<< lambda << " with error: " << sigLambda << endl;
             sigBeta = sqrt(sigPi*sigPi+exp(-2*beta)*sigBeta*sigBeta)/(exp(-beta)-Pi);
             
-            beta+= lambda;
+            beta += lambda;
 
-            if (Pi != 0){
-                std::cout << "lambda, ti, width = " << lambda << ", " << ti << ", "<<  inputHist[hInx]->GetBinWidth(ti) <<std::endl;
+            if(!isnan(lambda)){
+                unShadowed[hInx]->SetBinContent(ti,lambda);
+                unShadowed[hInx]->SetBinError(ti,sigLambda);
             }
-            unShadowed[hInx]->SetBinContent(ti,lambda);
-            unShadowed[hInx]->SetBinError(ti,sigLambda);
+            
+        
+            
         }
+        float fitEnd[6] = {.1,.1,.1,.1,.1,.1};
+        unShadowed[hInx]->Sumw2();
+        unShadowed[hInx]->Scale(1./unShadowed[hInx]->Integral());  
+        unShadowed[hInx]->Scale(1.,"width");
+        unShadowed[hInx]->Fit("pol0","WL","",1E-2,fitEnd[5-hInx]);
     }
+
     return unShadowed;
         
 }
@@ -89,7 +108,6 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
     //rebin histograms so all bins have statistics
     for(int j =0; j<121; j++){
 
-        //binArray[j]= ((pow(2.7162,(j)*0.09))/1000000000);   
         binArray[j]= ((pow(2.7162,j*0.19))/1E9);  
         
     }
@@ -110,7 +128,6 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
        
         TFile *myFile = TFile::Open(filenames[i]);
         TTreeReader myReader("TPulse", myFile);
-        TTreeReaderArray<Double_t> myMTS(myReader, "mts");
         TTreeReaderArray<Double_t> myTIME(myReader, "time");
         TTreeReaderArray<Double_t> myTrigTIME(myReader,"trigtime");
         TTreeReaderArray<Double_t> myWIDTH(myReader,"ToT");
@@ -149,6 +166,7 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
                 //logic to deal with two->seven pulses back to back (rarely see more than 2 except at room temp)
                 //fill the hist with time between of one pulse width (50 ns)
                 //increase the current time
+
                 if(myWIDTH[j]>(pulseWidth[i]+5))
                 {
                     filler(1,hist[i],pulseWidth[i]);
@@ -193,8 +211,9 @@ vector<TH1F*> histCollector(float VoV[], const char *filenames[], int temp, int 
         }   
         //get error per each bin and then scale each bin by its width to normalize
         hist[i]->Sumw2();
-        hist[i]->Scale(1.,"width");
+        
         hist[i]->Scale(1./hist[i]->Integral());     
+
         hist[i]->GetYaxis()->SetTitle("Probability/s");
         hist[i]->GetXaxis()->SetTitle("Time After Primary Pulse [s]");
 
@@ -211,7 +230,7 @@ void PDC_HoldOff(){
 
     //store the fits in a vector to retrieve later for error propagation
     std::vector< TF1* > fit;
-    std::vector<TH1F*> residuals;
+    std::vector< TF1* > fitUS;
 
     const int size = 6; // will need to change number of filenames in files array to match (should do as a vector, but root was seg faulting for me)
 
@@ -219,10 +238,12 @@ void PDC_HoldOff(){
 
     float fitRate[size];
     float fitError[size];
+    float fitRateUS[size];
+    float fitErrorUS[size];
 
     float temperature[1] = {999.0};
 
-    int dataNumbers[size] = {602,603,599,604,605,606};
+    int dataNumbers[size] = {589,590,591,592,593,594};
 
 
     //LOW STAT DATA
@@ -254,7 +275,8 @@ void PDC_HoldOff(){
     //room temp{0.5,1.5,3,4.5,6,7,8};
     //hold off{0.1,0.2,0.5,0.75,1,1.25,1.5,1.75}
 
-    float fitEndRange[size] = {0.6,0.6,0.6,0.6,0.6,0.6};
+    float fitEndRange[size] = {.8,.8,.8,.8,.8,.8};
+    float fitStartRange[size] = {5E-5,5E-5,1E-4,2E-4,2E-4,2E-4};
 
     const char *files[size] = {Form("root_output_files/output00%d.root",dataNumbers[0]),
     Form("root_output_files/output00%d.root",dataNumbers[1]),
@@ -279,17 +301,12 @@ void PDC_HoldOff(){
     for (int count = 0; count < size; count ++){
 
    
-        //histograms[count]->Scale(histScales[count]);
-        histograms[count]->Fit("expo","WL","",0.01,fitEndRange[count]); // L specifies log likelihood (which deals with the non-gaussian bin statistics in low count bins). We only fit after the first several bins to ignore afterpulsing. 
+        histograms[count]->Scale(histScales[count]);
+        histograms[count]->Scale(1.,"width");
+        histograms[count]->Fit("expo","WL","",fitStartRange[count],fitEndRange[count]); // L specifies log likelihood (which deals with the non-gaussian bin statistics in low count bins). We only fit after the first several bins to ignore afterpulsing. 
 
         fit.push_back(histograms[count]->GetFunction("expo")); // save the fit paramters to a vector
-
-        //create histogram of residuals (afterpulsing)
-        residuals.push_back(new TH1F(Form("residualsHist%d",count),Form("PulseWidth = %f [ns]",2*pulseWidth[count]), 120, binArray));
-        for (int scan = 0; scan < 120; scan++){
-            residuals[count]->SetBinContent(scan,histograms[count]->GetBinContent(scan) - fit[count]->Eval(histograms[count]->GetBinCenter(scan)));
-            //histograms[count]->GetBinContent(scan) - fit[count]->Eval(histograms[count]->GetBinCenter(scan)
-        }
+        fitUS.push_back(histogramsUnshadowed[count]->GetFunction("pol0")); // save the fit paramters to a vector
 
         //write histo and fit
         histograms[count]->Write(Form("Hist%d",count));
@@ -297,6 +314,8 @@ void PDC_HoldOff(){
 //  scaled
         fitRate[count] = (fit[count]->GetParameter(1))*(-1000000000)/(1.296);
         fitError[count] = fit[count]->GetParError(1)*(1000000000)/(1.296);
+        fitRateUS[count] = fitUS[count]->GetParameter(0)*(1000000000)/(1.296);
+        fitErrorUS[count] = fitUS[count]->GetParError(0)*(1000000000)/(1.296);
 
     }
 
@@ -308,11 +327,11 @@ void PDC_HoldOff(){
     c1->GetFrame()->SetFillColor(21);
     c1->GetFrame()->SetBorderSize(12);
 
-    auto gr = new TGraphErrors(size, pulseWidth,fitRate,overVolErrors,fitError);
+    auto gr = new TGraphErrors(size, pulseWidthNS,fitRate,overVolErrors,fitError);
     gr->SetMarkerStyle(22);
     gr->GetXaxis()->SetTitle("Pulse width [ns]");
     //scaled
-    gr->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
+    gr->GetYaxis()->SetTitle("DCR [Hz/]");
     //unscaled
     //gr->GetYaxis()->SetTitle("DCR [Hz]");
     gr->Draw();
@@ -329,9 +348,11 @@ void PDC_HoldOff(){
     gPad->SetLogy();
     gPad->SetLogx();
 
-    histograms[size-1]->Draw("hist PLC PMC");
+    histograms[0]->Draw("PLC PMC");
+
+    histograms[size-1]->Draw("PLC PMC");
     for (int num = 0; num < size-1; num++){
-        histograms[size-2-num]->Draw("same hist PLC PMC");
+        histograms[size-2-num]->Draw("same PLC PMC");
     }
     gPad->BuildLegend();
 // Afterpulsing plot
@@ -346,10 +367,9 @@ void PDC_HoldOff(){
     gPad->SetLogy();
     std::cout << "size of unshadowed: " <<histogramsUnshadowed.size()<<std::endl;
 
-    histogramsUnshadowed[size-1]->Draw("hist PLC PMC");
-    for (int num = 0; num < size-5; num++){
-        cout << num << endl;
-        histogramsUnshadowed[size-2-num]->Draw("hist same PLC PMC");
+    histogramsUnshadowed[size-1]->Draw(" PLC PMC");
+    for (int num = 1; num < size; num++){
+        histogramsUnshadowed[size-num-1]->Draw(" same PLC PMC");
     }
     gPad->BuildLegend();
     
