@@ -21,53 +21,90 @@ using namespace std;
 void TGraph_Stacker_PDC(){
 
     TMultiGraph *stackOfTemps = new TMultiGraph();
-
+    TMultiGraph *stackForColoring = new TMultiGraph();
+    std::vector< TF1* > fits;
     vector<TGraphErrors*> errorGraphs;
 
-    const int size = 7;
-    //naming is bad right now, silly mistake -- 60 is -60, 80 is -80
-    const char* files[size] = {"histOutput90.root","histOutput_133_7.root","histOutput_163_7.root","histOutput200.root","histOutput_223_32.root","histOutput_273_7.root","histOutput300.root"};
-    const char* graphs[size] = {"Graph90","Graph133_anode7","Graph163_anode7","Graph200","Graph223_anode32","Graph273_anode7","Graph300"};
-    const char* temps[size] = {"93","133","163","193","223","273","293"};
-    const float temperatures[size] = {93,133,163,193,223,273,293};
+    const int size = 6;
 
-    auto tempGr = new TGraphErrors(7);
+    const char* temps[size] = {"117","176","208","233","276","293"};
+    const int temperatures[size] = {117,176,208,233,276,293};
+    const int anode[3] = {7,20,32};
+    
+    std::vector<const char* > files; 
+    std::vector<std::vector<const char *> > graphs(6, std::vector<const char *>(3));
+    
+    
+
+    for (int i = 0; i < size; i++){
+        
+        files.push_back(Form("PDCOutput/histOutput_%d.root",temperatures[i]));
+        
+        for (int j = 0; j < 3; j++){
+            graphs[i][j] = (Form("Graph%d_anode%d",temperatures[i],anode[j]));
+        }
+    }
+
+    auto tempGr = new TGraphErrors(size*3);
+    auto tempGr2 = new TGraphErrors(size*3);
     tempGr->SetTitle(Form("DCR vs Temp @4VoV"));
     tempGr->GetXaxis()->SetTitle("Temp [K]");
     tempGr->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
+    tempGr2->SetTitle(Form("DCR vs Temp @4VoV"));
+    tempGr2->GetXaxis()->SetTitle("Temp [K]");
+    tempGr2->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
 
-    for(int i = 0; i < size; i++)
-    {
+    for(int i = 0; i < size; i++){
         TFile *myFile = TFile::Open(files[i]);
-        if(gSystem->AccessPathName(files[i]))
-        {
-            std::cout << "file does not exist" << std::endl;
-        } 
-        else 
-        {
-            std::cout << "file exists" << std::endl;
-        };
+            if(gSystem->AccessPathName(files[i]))
+            {
+                std::cout << "file does not exist" << std::endl;
+            } 
+            else 
+            {
+                std::cout << "file exists" << std::endl;
+            };
+            
+        for (int j = 0; j < 3; j++){
+            errorGraphs.push_back( (TGraphErrors*)myFile->Get(graphs[i][j]) );
+            
+            errorGraphs[3*i+j]->SetMarkerStyle(104);
+            cout << 1 <<endl;
+            if (temperatures[i]<235){
+                std::cout << errorGraphs[3*i+j]->GetPointX(0)<<std::endl;
+                std::cout << errorGraphs[3*i+j]->GetPointY(0)<< " " << errorGraphs[3*i+j]->GetErrorY(0) << std::endl;
+                std::cout << temperatures[i]<< " " << 5 << std::endl;
 
-        errorGraphs.push_back( (TGraphErrors*)myFile->Get(graphs[i]) );
-        errorGraphs[i]->SetMarkerStyle(104);
-        errorGraphs[i]->SetTitle(Form("Temp: %s C",temps[i]));
-        
-        if (temperatures[i]<250 || temperatures[i]==293){
-            std::cout << errorGraphs[i]->GetPointX(0)<<std::endl;
-            std::cout << errorGraphs[i]->GetPointY(0)<< " " << errorGraphs[i]->GetErrorY(0) << std::endl;
-            std::cout << temperatures[i]<< " " << 5 << std::endl;
-            tempGr->SetPoint(i,temperatures[i],errorGraphs[i]->GetPointY(0));
-            tempGr->SetPointError(i,5,errorGraphs[i]->GetErrorY(0));
-        }
-        else{
-            std::cout << errorGraphs[i]->GetPointX(3)<<std::endl;
-            std::cout << errorGraphs[i]->GetPointY(3)<< " " << errorGraphs[i]->GetErrorY(3) << std::endl;
-            std::cout << temperatures[i]<< " " << 5 << std::endl;
-            tempGr->SetPoint(i,temperatures[i],errorGraphs[i]->GetPointY(3));
-            tempGr->SetPointError(i,5,errorGraphs[i]->GetErrorY(3));
-        }
-        
+                if (errorGraphs[3*i+j]->GetErrorY(0) < errorGraphs[3*i+j]->GetPointY(0)*0.5){
+                    tempGr2->SetPoint(3*i+j,temperatures[i],errorGraphs[3*i+j]->GetPointY(0));
+                    tempGr2->SetPointError(3*i+j,5,errorGraphs[3*i+j]->GetErrorY(0));
+                    tempGr2->SetMarkerColor(kRed);
+                }
+                else{
+                    tempGr->SetPoint(3*i+j,temperatures[i],errorGraphs[3*i+j]->GetPointY(0));
+                    tempGr->SetPointError(3*i+j,5,errorGraphs[3*i+j]->GetErrorY(0));
+                }
+                
+                
+            }
+            else{
+                std::cout << errorGraphs[3*i+j]->GetPointX(3)<<std::endl;
+                std::cout << errorGraphs[3*i+j]->GetPointY(3)<< " " << errorGraphs[3*i+j]->GetErrorY(3) << std::endl;
+                std::cout << temperatures[i]<< " " << 5 << std::endl;
 
+                if (errorGraphs[3*i+j]->GetErrorY(3) < errorGraphs[3*i+j]->GetPointY(3)*0.5){
+                    tempGr2->SetPoint(3*i+j,temperatures[i],errorGraphs[3*i+j]->GetPointY(3));
+                    tempGr2->SetPointError(3*i+j,5,errorGraphs[3*i+j]->GetErrorY(3));
+                    tempGr2->SetMarkerColor(kRed);
+                }
+                else{
+                    tempGr->SetPoint(3*i+j,temperatures[i],errorGraphs[3*i+j]->GetPointY(3));
+                    tempGr->SetPointError(3*i+j,5,errorGraphs[3*i+j]->GetErrorY(3));
+                }
+                
+            }
+            cout << 2 <<endl;
+        }
         delete myFile;
     }
 
@@ -79,15 +116,44 @@ void TGraph_Stacker_PDC(){
     c1->GetFrame()->SetBorderSize(12);
     
     // 
-    for (int j = 0; j<size;j++){
-        errorGraphs[j]->SetMarkerColor(j+1);
-        stackOfTemps->Add(errorGraphs[j]);
+    for (int j = 0; j<size*3;j++){
+        
+        if (errorGraphs[j]->GetErrorY(0) < errorGraphs[j]->GetPointY(0)*0.5 && errorGraphs[j]->GetErrorY(3) < errorGraphs[j]->GetPointY(3)*0.5){
+            errorGraphs[j]->SetMarkerColor(2);
+            errorGraphs[j]->SetLineColor(2);
+            stackOfTemps->Add(errorGraphs[j]);
+        }
+        else{
+            errorGraphs[j]->SetMarkerColor(1);
+        }
+        if (j<3){
+            errorGraphs[j]->SetMarkerStyle(53);
+        }
+        else if (3<=j && j<6){
+            errorGraphs[j]->SetMarkerStyle(54);
+        }
+        else if (6<=j && j<9){
+            errorGraphs[j]->SetMarkerStyle(55);
+        }
+        else if (9<=j && j<12){
+            errorGraphs[j]->SetMarkerStyle(56);
+        }
+        else if (9<=j && j<12){
+            errorGraphs[j]->SetMarkerStyle(57);
+        }
+        else if (12<=j && j<15){
+            errorGraphs[j]->SetMarkerStyle(58);
+        }
+        else{
+            errorGraphs[j]->SetMarkerStyle(59);
+        }
+        
     
     }
 
     gPad->SetLogy();
 
-    stackOfTemps->SetTitle(Form("DCR vs VoV for 7 Temperatures"));
+    stackOfTemps->SetTitle(Form("DCR vs VoV for 6 Temperatures"));
     stackOfTemps->GetXaxis()->SetTitle("VoV [V]");
     stackOfTemps->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");
 
@@ -103,7 +169,14 @@ void TGraph_Stacker_PDC(){
     
     gPad->SetLogy();
     tempGr->SetMarkerStyle(24);
-    tempGr->Draw("ALP");
+    tempGr->SetLineStyle(0);
+    tempGr2->SetMarkerStyle(24);
+    tempGr2->SetLineStyle(0);
+    tempGr2->SetLineColor(2);
+    stackForColoring->Add(tempGr);
+    stackForColoring->Add(tempGr2);
+
+    stackForColoring->Draw("AP");
 
 
 }

@@ -243,7 +243,7 @@ void PDC_HoldOff(){
 
     float temperature[1] = {999.0};
 
-    int dataNumbers[size] = {589,590,591,592,593,594};
+    int dataNumbers[size] = {602,603,599,604,605,606};
 
 
     //LOW STAT DATA
@@ -275,8 +275,8 @@ void PDC_HoldOff(){
     //room temp{0.5,1.5,3,4.5,6,7,8};
     //hold off{0.1,0.2,0.5,0.75,1,1.25,1.5,1.75}
 
-    float fitEndRange[size] = {.8,.8,.8,.8,.8,.8};
-    float fitStartRange[size] = {5E-5,5E-5,1E-4,2E-4,2E-4,2E-4};
+    float fitEndRange[size] = {1,1,1,1,1,1};
+    float fitStartRange[size] = {1E-3,1E-3,1E-3,1E-3,1E-3,1E-3};
 
     const char *files[size] = {Form("root_output_files/output00%d.root",dataNumbers[0]),
     Form("root_output_files/output00%d.root",dataNumbers[1]),

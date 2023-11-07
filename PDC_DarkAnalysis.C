@@ -268,9 +268,16 @@ void PDC_DarkAnalysis(
     tempData.push_back(TemperatureDependentData(293,{1,2,3,4,5},{3E-4,2E-4,1E-4,1E-4,1E-4},{2E-2,1.5E-2,1E-2,9E-3,8E-3}));
     tempData.push_back(TemperatureDependentData(273,{1,2,3,4,5},{1E-3,1E-3,9E-4,8E-4,8E-4},{9E-2,7E-2,5E-2,3E-2,2E-2}));
     tempData.push_back(TemperatureDependentData(223,{4,5,6,7,8},{3E-3,4E-3,2E-3,1.3E-3,1E-3},{2E-1,1.8E-1,9E-2,7E-2,4E-2}));
+    tempData.push_back(TemperatureDependentData(193,{4,5,6,7,8},{3E-3,2.8E-3,2.4E-3,2.2E-3,2E-3},{1.4E-1,1E-1,9E-2,7E-2,5E-2}));
     tempData.push_back(TemperatureDependentData(163,{4,5,6,7,8},{3E-3,2.8E-3,2.4E-3,2.2E-3,2E-3},{1.4E-1,1E-1,9E-2,7E-2,5E-2}));
     tempData.push_back(TemperatureDependentData(133,{4,5,6,7,8},{3E-3,2.8E-3,2.4E-3,2.2E-3,2E-3},{1.4E-1,1E-1,9E-2,7E-2,5E-2}));
-    tempData.push_back(TemperatureDependentData(93,{4,5,6,7,8},{1E-1,9E-2,7E-2,5E-2,2E-2},{3,2.5,2,1.5,1}));
+    tempData.push_back(TemperatureDependentData(93,{4,5,6,7,8},{1E-3,1E-3,1E-3,1E-3,1E-3},{3,2.5,2,1.5,1}));
+    tempData.push_back(TemperatureDependentData(276,{1,2,3,4,5},{1E-3,1E-3,9E-4,8E-4,8E-4},{9E-2,7E-2,5E-2,3E-2,2E-2}));
+    tempData.push_back(TemperatureDependentData(233,{4,5,6,7,8},{3E-3,4E-3,2E-3,1.3E-3,1E-3},{2E-1,1.8E-1,9E-2,7E-2,4E-2}));
+    tempData.push_back(TemperatureDependentData(208,{4,5,6,7,8},{3E-3,2.8E-3,2.4E-3,2.2E-3,2E-3},{1.6,0.7,0.5,0.3,0.1}));
+    tempData.push_back(TemperatureDependentData(163,{4,5,6,7,8},{3E-3,2.8E-3,2.4E-3,2.2E-3,2E-3},{1.4E-1,1E-1,9E-2,7E-2,5E-2}));
+    tempData.push_back(TemperatureDependentData(133,{4,5,6,7,8},{3E-3,2.8E-3,2.4E-3,2.2E-3,2E-3},{1.4E-1,1E-1,9E-2,7E-2,5E-2}));
+    tempData.push_back(TemperatureDependentData(117,{4,5,6,7,8},{1E-3,1E-3,1E-3,1E-3,1E-3},{3,2.5,2,1.5,1}));
     
     int anode = inSPAD;
     int temp = inTemp;
@@ -307,6 +314,10 @@ void PDC_DarkAnalysis(
     double fitError[fileNumber];
     double fitRateUS[fileNumber];
     double fitErrorUS[fileNumber];
+    double fitChiSqr[fileNumber];
+    double fitChiSqrUS[fileNumber];
+    double reducedChiSquaredErrors[fileNumber];
+    double DoF = 88.0;
 
     int dataNumbers[fileNumber] = {inRun1,inRun2,inRun3,inRun4,inRun5};
 
@@ -330,7 +341,7 @@ void PDC_DarkAnalysis(
 
     // output file
 
-    TFile *out = new TFile(Form("PDCOutput/histOutput_%d_%d.root",temp,anode), "RECREATE");
+    TFile *out = new TFile(Form("PDCOutput/histOutput_%d.root",temp), "UPDATE");
 
     for (int count = 0; count < fileNumber; count ++){
 
@@ -349,7 +360,14 @@ void PDC_DarkAnalysis(
         fitError[count] = fit[count]->GetParError(1)*area;
         fitRateUS[count] = fitUS[count]->GetParameter(0);
         fitErrorUS[count] = fitUS[count]->GetParError(0);
+        fitChiSqr[count] = fit[count]->GetChisquare();
+        fitChiSqrUS[count] = fitUS[count]->GetChisquare();
+
     }
+    // scale the errors by the reduced chi squared
+    for (size_t i = 0; i < fileNumber; i++) {
+            reducedChiSquaredErrors[i] = fitError[i] * fitChiSqr[i]/88;
+        }
 
     // make the graphs
 
@@ -360,7 +378,7 @@ void PDC_DarkAnalysis(
     c1->GetFrame()->SetFillColor(21);
     c1->GetFrame()->SetBorderSize(12);
 
-    auto gr = new TGraphErrors(fileNumber, overV.data(),fitRate,overVolErrors,fitError);
+    auto gr = new TGraphErrors(fileNumber, overV.data(),fitRate,overVolErrors,reducedChiSquaredErrors);
     gr->SetMarkerStyle(22);
     gr->GetXaxis()->SetTitle("VoV [V]");
     gr->GetYaxis()->SetTitle("DCR [Hz/m^{2}]");

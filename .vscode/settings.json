@@ -75,6 +75,7 @@
         "algorithm": "cpp",
         "functional": "cpp",
         "rootTest.C": "cpp",
-        "DSLMClusteringHPCC (1).C": "cpp"
+        "DSLMClusteringHPCC (1).C": "cpp",
+        "Fit_DN_VUV4_MINUIT_asym_FINAL_x2i_not_apprixmated_fixed.C": "cpp"
     }
 }
